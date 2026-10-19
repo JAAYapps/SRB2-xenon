@@ -20,6 +20,10 @@
 #pragma warning(default : 4214 4244)
 #endif
 
+#ifdef _XENON
+#include <xenon_sound/sound.h>
+#endif
+
 #include "SDL_mixer.h"
 
 /* This is the version number macro for the current SDL_mixer version: */
@@ -69,6 +73,9 @@ static Mix_Music *music;
 static UINT8 music_volume, midi_volume, sfx_volume;
 static float loop_point;
 
+static void *current_music_lump = NULL; 
+static volatile boolean need_music_loop = false;
+
 #ifdef HAVE_LIBGME
 static Music_Emu *gme;
 static INT32 current_track;
@@ -78,7 +85,9 @@ void I_StartupSound(void)
 {
 	I_Assert(!sound_started);
 	sound_started = true;
-
+#ifdef _XENON
+    xenon_sound_init();
+#endif
 	midimode = false;
 	music = NULL;
 	music_volume = midi_volume = sfx_volume = 0;
@@ -86,8 +95,15 @@ void I_StartupSound(void)
 #if SDL_MIXER_VERSION_ATLEAST(1,2,11)
 	Mix_Init(MIX_INIT_FLAC|MIX_INIT_MOD|MIX_INIT_MP3|MIX_INIT_OGG);
 #endif
-	Mix_OpenAudio(44100, AUDIO_S16LSB, 2, 2048);
+#ifdef _XENON
+    // Forced 48kHz for the Xenos hardware and AUDIO_S16 for Big Endian CPU
+	// Modified version of the libsdlxenon is required.
+    Mix_OpenAudio(48000, AUDIO_S16, 2, 16384);
+#else
+    Mix_OpenAudio(44100, AUDIO_S16LSB, 2, 2048);
+#endif
 	Mix_AllocateChannels(256);
+	//Mix_PlayMusic(music, 0);
 }
 
 void I_ShutdownSound(void)
@@ -107,6 +123,12 @@ void I_ShutdownSound(void)
 
 void I_UpdateSound(void)
 {
+	if (need_music_loop)
+	{
+		need_music_loop = false;
+		Mix_PlayMusic(music, 0);
+		Mix_SetMusicPosition(loop_point);
+	}
 }
 
 // this is as fast as I can possibly make it.
@@ -417,8 +439,9 @@ void I_SetSfxVolume(UINT8 volume)
 // Music hooks
 static void music_loop(void)
 {
-	Mix_PlayMusic(music, 0);
-	Mix_SetMusicPosition(loop_point);
+	need_music_loop = true;
+	//Mix_PlayMusic(music, 0);
+	//Mix_SetMusicPosition(loop_point);
 }
 
 #ifdef HAVE_LIBGME
@@ -516,7 +539,18 @@ boolean I_StartDigSong(const char *musicname, boolean looping)
 	else
 		midimode = false;
 
-	data = (char *)W_CacheLumpNum(lumpnum, PU_MUSIC);
+	//data = (char *)W_CacheLumpNum(lumpnum, PU_MUSIC);
+	need_music_loop = false; // Reset the loop flag just in case
+
+	if (current_music_lump) 
+	{
+		Z_Free(current_music_lump); // Free the old song
+		current_music_lump = NULL;
+	}
+	// Use PU_STATIC so the engine never randomly deletes the memory!
+	current_music_lump = W_CacheLumpNum(lumpnum, PU_STATIC);
+	data = (char *)current_music_lump;
+
 	len = W_LumpLength(lumpnum);
 
 #ifdef HAVE_LIBGME
@@ -678,6 +712,9 @@ void I_StopDigSong(void)
 {
 	if (midimode)
 		return;
+
+	need_music_loop = false;
+
 #ifdef HAVE_LIBGME
 	if (gme)
 	{
@@ -693,6 +730,12 @@ void I_StopDigSong(void)
 	Mix_HookMusicFinished(NULL);
 	Mix_FreeMusic(music);
 	music = NULL;
+
+	if (current_music_lump)
+	{
+		Z_Free(current_music_lump);
+		current_music_lump = NULL;
+	}
 }
 
 void I_SetDigMusicVolume(UINT8 volume)

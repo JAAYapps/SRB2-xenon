@@ -48,6 +48,38 @@ PSP_MAIN_THREAD_NAME("SRB2");
 PSP_MAIN_THREAD_STACK_SIZE_KB(256);
 #endif
 
+#ifdef _XENON
+// #include <xenos/xenos.h>
+// #include <console/console.h>
+// #include <usb/usbmain.h>
+// #include <libfat/fat.h>
+// #include <xenon_soc/xenon_power.h>
+// #include <diskio/ata.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <debug.h>
+#include <xenos/xenos.h>
+#include <diskio/ata.h>
+#include <input/input.h>
+#include <console/console.h>
+#include <diskio/disc_io.h>
+#include <sys/iosupport.h>
+#include <usb/usbmain.h>
+#include <time/time.h>
+#include <ppc/timebase.h>
+#include <xenon_soc/xenon_power.h>
+#include <elf/elf.h>
+#include <dirent.h>
+#include <xenon_sound/sound.h>
+
+#include <libfat/fat.h>
+
+int bdev_enum(int handle, const char **name);
+extern void delay(int);
+#endif
+
 #ifdef SDL
 
 #ifdef HAVE_TTF
@@ -133,7 +165,52 @@ static inline VOID MakeCodeWritable(VOID)
 	\return	int
 */
 FUNCNORETURN
-#if defined (_XBOX) && defined (__GNUC__)
+#if defined (_XENON)
+#undef main
+int main()
+{
+	// 1. Prevent arg segfaults
+    myargc = 0; 
+    myargv = NULL;
+    const char *logdir = NULL;
+    int handle = -1;
+    const char *s;
+    char mountpath[32];
+    struct controller_data_s pad;
+
+    // Initialize Hardware
+    xenos_init(VIDEO_MODE_AUTO);
+    console_init();
+    xenon_make_it_faster(XENON_SPEED_FULL);
+
+    printf("\n\n--- SRB2 XBOX 360 BOOT SEQUENCE ---\n\n");
+
+    usb_init();
+    usb_do_poll();
+    xenon_ata_init();
+    xenon_atapi_init();
+
+	fatInitDefault();
+
+    printf("Waiting for USB device to mount...\n");
+    handle=bdev_enum(handle,&s);
+    if(handle<0) return 0;
+
+    sprintf(mountpath, "%s:/", s);
+    chdir(mountpath);
+	logdir = mountpath;
+	I_PutEnv(va("HOME=%s", mountpath));
+    printf("Successfully mounted %s and changed directory.\n", mountpath);
+    printf("\nREADY! Press the 'A' button on your controller to launch SRB2...\n");
+    
+    do {
+        usb_do_poll();
+        get_controller_data(&pad, 0);
+    } while (!pad.a);
+
+    printf("\nStarting Engine...\n");
+
+#elif defined (_XBOX) && defined (__GNUC__)
 void XBoxStartup()
 {
 	const char *logdir = NULL;
@@ -158,6 +235,8 @@ int main(int argc, char **argv)
 	I_StartupTTF(FONTPOINTSIZE, SDL_INIT_VIDEO, SDL_SWSURFACE|SDL_DOUBLEBUF);
 #elif defined(_WIN32)
 	I_StartupTTF(FONTPOINTSIZE, SDL_INIT_VIDEO|SDL_INIT_AUDIO, SDL_SWSURFACE);
+#elif defined(_XENON)
+	I_StartupTTF(FONTPOINTSIZE, SDL_INIT_VIDEO|SDL_INIT_AUDIO, SDL_SWSURFACE);
 #else
 	I_StartupTTF(FONTPOINTSIZE, SDL_INIT_VIDEO, SDL_SWSURFACE);
 #endif
@@ -174,6 +253,7 @@ int main(int argc, char **argv)
 	if_config(localip, netmask, gateway, TRUE);
 
 #ifdef REMOTE_DEBUGGING
+
 #if REMOTE_DEBUGGING == 0
 	DEBUG_Init(GDBSTUB_DEVICE_TCP, GDBSTUB_DEF_TCPPORT); // Port 2828
 #elif REMOTE_DEBUGGING > 2
@@ -191,7 +271,9 @@ int main(int argc, char **argv)
 		I_PutEnv(va("HOME=%ssrb2wii", wiicwd));
 #endif
 
+#ifndef _XENON
 	logdir = D_Home();
+#endif
 
 #ifdef LOGMESSAGES
 #if defined(_WIN32_WCE) || defined(GP2X)

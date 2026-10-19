@@ -157,9 +157,11 @@ typedef long ssize_t;
 #define HAVE_DOSSTR_FUNCS
 #endif
 
+#ifndef _XENON
 #ifndef HAVE_DOSSTR_FUNCS
 int strupr(char *n); // from dosstr.c
 int strlwr(char *n); // from dosstr.c
+#endif
 #endif
 
 #include <stddef.h> // for size_t
@@ -191,7 +193,15 @@ size_t strlcpy(char *dst, const char *src, size_t siz);
 		#include <stdbool.h>  //_bool_true_false_are_defined?
 		#define boolean bool
 	#else
+		#ifdef _XENON
+		#undef true
+		#undef false
+		#define true 1
+		#define false 0
+		typedef int boolean;
+		#else
 		typedef enum {false, true} boolean;
+		#endif
 	#endif
 	//#endif // __cplusplus
 #endif // __BYTEBOOL__

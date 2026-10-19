@@ -90,6 +90,15 @@ int	snprintf(char *str, size_t n, const char *fmt, ...);
 #include "hardware/hw3sound.h"
 #endif
 
+// #ifdef _XENON
+// #include <xenos/xenos.h>
+// #include <console/console.h>
+// #include <usb/usbmain.h>
+// #include <libfat/fat.h>
+// #include <xenon_soc/xenon_power.h>
+// #include <diskio/ata.h>
+// #endif
+
 //
 // DEMO LOOP
 //

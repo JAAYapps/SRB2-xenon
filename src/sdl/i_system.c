@@ -94,8 +94,10 @@ void __set_fpscr(long); // in libgcc / kernel's startup.s?
 //#include <pspiofilemgr.h>
 #elif !defined(_PS3)
 #if defined (__unix__) || defined(__APPLE__) || (defined (UNIXCOMMON) && !defined (_arch_dreamcast) && !defined (__HAIKU__) && !defined (_WII))
-#if defined (__linux__)
+#if defined (__linux__) && !defined(_XENON)
 #include <sys/vfs.h>
+#elif defined(_XENON)
+#include <ppc/timebase.h> // libxenon hardware ticks
 #else
 #include <sys/param.h>
 #include <sys/mount.h>
@@ -111,7 +113,7 @@ void __set_fpscr(long); // in libgcc / kernel's startup.s?
 #endif
 
 #ifndef _PS3
-#if defined (__linux__) || (defined (UNIXCOMMON) && !defined (_arch_dreamcast) && !defined (_PSP) && !defined (__HAIKU__) && !defined (_WII))
+#if defined (__linux__) && !defined (_XENON) || (defined (UNIXCOMMON) && !defined (_arch_dreamcast) && !defined (_PSP) && !defined (__HAIKU__) && !defined (_WII) && !defined (_XENON))
 #ifndef NOTERMIOS
 #include <termios.h>
 #include <sys/ioctl.h> // ioctl
@@ -121,7 +123,7 @@ void __set_fpscr(long); // in libgcc / kernel's startup.s?
 #endif
 
 #ifndef NOMUMBLE
-#if defined (__linux__) && !defined(_PS3) // need -lrt
+#if defined (__linux__) && !defined(_PS3) && !defined (_XENON) // need -lrt
 #include <sys/mman.h>
 #ifdef MAP_FAILED
 #define HAVE_SHM
@@ -213,6 +215,13 @@ void __set_fpscr(long); // in libgcc / kernel's startup.s?
 #define DEFAULTWADLOCATION2 "\\games\\srb2"
 #define DEFAULTSEARCHPATH1 "c:\\games"
 #define DEFAULTSEARCHPATH2 "\\games"
+#elif defined (_XENON)
+#define NOCWD
+#define NOHOME
+#define NEED_SDL_GETENV
+#define DEFAULTWADLOCATION1 "uda:/srb2"
+#define DEFAULTWADLOCATION2 "uda:/"
+#define DEFAULTSEARCHPATH1 "uda:/"
 #endif
 
 /**	\brief WAD file to look for
@@ -236,7 +245,10 @@ static char returnWadPath[256];
 #include "../filesrch.h"
 #include "endtxt.h"
 #include "sdlmain.h"
-
+#ifdef _XENON
+#include <usb/usbmain.h>
+#include <input/input.h>
+#endif
 #include "../i_joy.h"
 
 #include "../m_argv.h"
@@ -991,7 +1003,52 @@ static void I_ShutdownJoystick(void)
 
 void I_GetJoystickEvents(void)
 {
-	static event_t event = {0,0,0,0};
+	event_t event = {0,0,0,0};
+#ifdef _XENON
+    struct controller_data_s pad;
+    static struct controller_data_s last_pad;
+
+    // Get controller data for the first player
+    usb_do_poll();
+    if (get_controller_data(&pad, 0)) {
+        
+        // Helper macro to handle button events
+        #define CHECK_BUTTON(member, key) \
+            if (pad.member && !last_pad.member) { \
+                event.type = ev_keydown; \
+                event.data1 = key; \
+                D_PostEvent(&event); \
+            } else if (!pad.member && last_pad.member) { \
+                event.type = ev_keyup; \
+                event.data1 = key; \
+                D_PostEvent(&event); \
+            }
+
+        // Map digital buttons to SRB2 keys
+        //CHECK_BUTTON(a,    KEY_MOUSE1);      // A -> Jump
+        //CHECK_BUTTON(b,    KEY_JOY1 + 1);  // B -> Spin
+		CHECK_BUTTON(b,    KEY_ESCAPE);
+        //CHECK_BUTTON(x,    KEY_JOY1 + 2);  // X
+        //CHECK_BUTTON(y,    KEY_JOY1 + 3);  // Y
+        //CHECK_BUTTON(start, KEY_JOY1 + 4); // Start -> Pause
+		CHECK_BUTTON(start, KEY_ENTER);
+		CHECK_BUTTON(back,  KEY_ESCAPE);   // Back Button -> Escape
+
+        // // Map D-Pad to SRB2 Hats
+        // CHECK_BUTTON(up,    KEY_HAT1);
+        // CHECK_BUTTON(down,  KEY_HAT1 + 1);
+        // CHECK_BUTTON(left,  KEY_HAT1 + 2);
+        // CHECK_BUTTON(right, KEY_HAT1 + 3);
+
+        //D_PostEvent(&event);
+
+        last_pad = pad;
+        #undef CHECK_BUTTON
+		//joystick_started = true;
+		CONS_Printf("Preesed: %d", event.data1);
+
+    }
+#endif
 	INT32 i = 0;
 	UINT64 joyhats = 0;
 #if 0
@@ -1522,6 +1579,11 @@ static int joy_open2(const char *fname)
 //
 void I_InitJoystick(void)
 {
+#ifdef _XENON
+	if (strcmp(cv_usejoystick.string, "0"))
+		cv_usejoystick.string = "1";
+    cv_usejoystick.value = 1;
+#endif
 	I_ShutdownJoystick();
 	if (!strcmp(cv_usejoystick.string, "0") || M_CheckParm("-nojoy"))
 		return;
@@ -1563,6 +1625,9 @@ static void I_ShutdownInput(void)
 
 INT32 I_NumJoys(void)
 {
+#ifdef _XENON
+    return 1;
+#endif
 	INT32 numjoy = 0;
 	if (SDL_WasInit(SDL_INIT_JOYSTICK) == 0)
 	{
@@ -2154,7 +2219,10 @@ static void I_ShutdownTimer(void)
 //
 tic_t I_GetTime (void)
 {
-#ifdef _arch_dreamcast
+#ifdef _XENON
+	static Uint64 basetime = 0;
+	       Uint64 ticks = (mftb() * 1000) / PPC_TIMEBASE_FREQ;
+#elif defined (_arch_dreamcast)
 	static Uint64 basetime = 0;
 	       Uint64 ticks = timer_ms_gettime64(); //using timer_ms_gettime64 instand of SDL_GetTicks for the Dreamcast
 #else
@@ -2543,7 +2611,7 @@ void I_GetDiskFreeSpace(INT64 *freespace)
 #if defined (_arch_dreamcast) || defined (_PSP)
 	*freespace = 0;
 #elif defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON)
-#if defined (SOLARIS) || defined (__HAIKU__) || defined (_WII) || defined (_PS3)
+#if defined (SOLARIS) || defined (__HAIKU__) || defined (_WII) || defined (_PS3) || defined (_XENON)
 	*freespace = INT32_MAX;
 	return;
 #else // Both Linux and BSD have this, apparently.
@@ -2586,7 +2654,10 @@ void I_GetDiskFreeSpace(INT64 *freespace)
 
 char *I_GetUserName(void)
 {
-#ifdef GP2X
+#ifdef _XENON
+    static char username[MAXPLAYERNAME] = "XenonUser";
+    return username;
+#elif GP2X
 	static char username[MAXPLAYERNAME] = "GP2XUSER";
 	return username;
 #elif defined (PSP)

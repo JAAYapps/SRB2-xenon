@@ -28,11 +28,16 @@
 #define JOYBUTTONS   8 //  8 buttons
 #define JOYHATS      2  // 2 hats
 #define JOYAXISSET   3  // 3 Sets of 2 axises
-#elif defined (_XBOX)
+#elif defined (_XBOX) // Trying to get the controlls to work
 #define MOUSEBUTTONS 5
 #define JOYBUTTONS   12 // 12 buttons
 #define JOYHATS      1  // 1 hat
 #define JOYAXISSET   2  // 2 Sets of 2 axises
+#elif defined (_XENON)
+#define MOUSEBUTTONS 5
+#define JOYBUTTONS   12 // 12 buttons
+#define JOYHATS      1  // 1 hat
+#define JOYAXISSET   3  // 3 Sets of 2 axises
 #elif defined (_PSP)
 #define MOUSEBUTTONS 3
 #define JOYBUTTONS   14 // 10 buttons

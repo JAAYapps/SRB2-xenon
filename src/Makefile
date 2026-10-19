@@ -91,6 +91,37 @@ D_FILES=$(D_DIR)/srb2.srb \
 
 PKG_CONFIG?=pkg-config
 
+ifdef XENON
+include $(DEVKITXENON)/rules
+
+override CC = xenon-gcc
+override CXX = xenon-g++
+override LD = xenon-gcc
+override OBJCOPY = xenon-objcopy
+override STRIP = xenon-strip
+
+NOOBJDUMP=1
+NOPNG=1
+NOVERSION=1
+NONET=1
+#NOHS=0
+NOHW=1
+NONX86=1
+NOASM=1
+SDL=1
+
+INTERFACE := sdl
+OBJDIR := ../objs/xenon
+BIN := ../bin/xenon
+
+SDL_CONFIG := /bin/true
+override SDL_CFLAGS = -I$(DEVKITXENON)/usr/include -I$(DEVKITXENON)/usr/include/SDL
+override SDL_LDFLAGS = -L$(DEVKITXENON)/usr/lib -lSDL -lfat -lxenon -lm
+
+OPTS += -D_XENON -DSRB2_BIG_ENDIAN -D__BIG_ENDIAN__ -DHAVE_MIXER $(MACHDEP) -O2 -I$(DEVKITXENON)/usr/include
+LDFLAGS += $(MACHDEP) -T$(DEVKITXENON)/app.lds -u _start -L$(DEVKITXENON)/usr/lib
+endif
+
 ifdef WIILINUX
 LINUX=1
 endif
@@ -517,6 +548,10 @@ ifdef DC
 all:	 pre-build $(BIN)/$(BINNAME) post-build
 endif
 
+ifdef XENON
+all: pre-build $(BIN)/$(EXENAME) post-build-xenon
+endif
+
 ifndef DC
 ifndef PSP
 ifndef XBOX
@@ -577,10 +612,18 @@ asm:
 # executable
 # NOTE: DJGPP's objcopy do not have --add-gnu-debuglink
 
+ifndef XENON
 $(BIN)/$(EXENAME): $(POS) $(OBJS)
 	-$(MKDIR) $(BIN)
 	@echo Linking $(EXENAME)...
 	$(LD) $(LDFLAGS) $(OBJS) -o $(BIN)/$(EXENAME) $(LIBS)
+else
+$(BIN)/$(EXENAME): $(POS) $(OBJS)
+	-$(MKDIR) $(BIN)
+	@echo Linking XENON $(EXENAME)...
+	$(LD) $(OBJS) -Wl,--entry=_start $(LDFLAGS) -lSDL_mixer -lvorbisfile -lvorbis -logg -lSDL -lfat -lxenon -lm -lc -o $(BIN)/$(EXENAME)
+endif
+
 ifndef VALGRIND
 ifndef NOOBJDUMP
 	@echo Dumping debugging info
@@ -915,6 +958,15 @@ $(OBJDIR)/lq2x.o: $(INTERFACE)/filter/lq2x.c $(INTERFACE)/filter/lq2x.c \
  $(INTERFACE)/filter/hq2x.h $(INTERFACE)/filter/lq2x.h
 	$(CC) $(CFLAGS) $(WFLAGS) -c $< -o $@
 endif
+endif
+
+ifdef XENON
+post-build-xenon: $(BIN)/$(EXENAME)
+	@echo "Converting 64-bit ELF to Xenon ELF32..."
+	$(OBJCOPY) -O elf32-powerpc --adjust-vma 0x80000000 $(BIN)/$(EXENAME) $(BIN)/$(EXENAME).elf32
+	@echo "Stripping for XeLL..."
+	$(PREFIX)strip $(BIN)/$(EXENAME).elf32
+	@echo "Build complete: $(BIN)/$(EXENAME).elf32"
 endif
 
 #############################################################

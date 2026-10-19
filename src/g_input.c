@@ -1105,6 +1105,51 @@ void G_Controldefault(void)
 	//gamecontrolbis[gc_straferight][0] = 'x';
 	//gamecontrolbis[gc_strafeleft ][0] = 'z';
 }
+#elif defined (_XENON) || defined (_XBOX)
+void G_Controldefault(void)
+{
+    // Player 1 (Local)
+    gamecontrol[gc_forward    ][0] = KEY_HAT1+0; // D-Pad Up
+    gamecontrol[gc_backward   ][0] = KEY_HAT1+1; // D-Pad Down
+    gamecontrol[gc_turnleft   ][0] = KEY_HAT1+2; // D-Pad Left
+    gamecontrol[gc_turnright  ][0] = KEY_HAT1+3; // D-Pad Right
+
+    gamecontrol[gc_jump       ][0] = KEY_JOY1+0; // A Button
+    gamecontrol[gc_use        ][0] = KEY_JOY1+2; // X Button (Spin)
+    gamecontrol[gc_use        ][1] = KEY_JOY1+1; // B Button (Spin Alternative)
+    gamecontrol[gc_tossflag   ][0] = KEY_JOY1+3; // Y Button
+
+    gamecontrol[gc_weaponnext ][0] = KEY_JOY1+7; // Right Bumper (JOYR)
+    gamecontrol[gc_weaponprev ][0] = KEY_JOY1+6; // Left Bumper (JOYL)
+    gamecontrol[gc_fire       ][0] = KEY_JOY1+7; // Right Bumper (Fire Rings)
+    gamecontrol[gc_firenormal ][0] = KEY_JOY1+6; // Left Bumper (Normal Rings)
+
+    gamecontrol[gc_pause      ][0] = KEY_JOY1+8; // Start Button
+    gamecontrol[gc_scores     ][0] = KEY_JOY1+9; // Back Button
+    gamecontrol[gc_camtoggle  ][0] = KEY_JOY1+10; // Left Stick Click
+    gamecontrol[gc_centerview ][0] = KEY_JOY1+11; // Right Stick Click
+
+    // Player 2 (Split-screen)
+    gamecontrolbis[gc_forward    ][0] = KEY_2HAT1+0; 
+    gamecontrolbis[gc_backward   ][0] = KEY_2HAT1+1; 
+    gamecontrolbis[gc_turnleft   ][0] = KEY_2HAT1+2; 
+    gamecontrolbis[gc_turnright  ][0] = KEY_2HAT1+3; 
+
+    gamecontrolbis[gc_jump       ][0] = KEY_2JOY1+0; 
+    gamecontrolbis[gc_use        ][0] = KEY_2JOY1+2; 
+    gamecontrolbis[gc_use        ][1] = KEY_2JOY1+1; 
+    gamecontrolbis[gc_tossflag   ][0] = KEY_2JOY1+3; 
+
+    gamecontrolbis[gc_weaponnext ][0] = KEY_2JOY1+7; 
+    gamecontrolbis[gc_weaponprev ][0] = KEY_2JOY1+6; 
+    gamecontrolbis[gc_fire       ][0] = KEY_2JOY1+7; 
+    gamecontrolbis[gc_firenormal ][0] = KEY_2JOY1+6; 
+
+    gamecontrolbis[gc_pause      ][0] = KEY_2JOY1+8; 
+    gamecontrolbis[gc_scores     ][0] = KEY_2JOY1+9; 
+    gamecontrolbis[gc_camtoggle  ][0] = KEY_2JOY1+10;
+    gamecontrolbis[gc_centerview ][0] = KEY_2JOY1+11;
+}
 #elif defined (_PSP)
 void G_Controldefault(void)
 {

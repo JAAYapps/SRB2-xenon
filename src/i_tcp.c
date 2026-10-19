@@ -12,6 +12,8 @@
 ///        This is not really OS-dependent because all OSes have the same socket API.
 ///        Just use ifdef for OS-dependent parts.
 
+#ifndef _XENON
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -1485,3 +1487,11 @@ boolean I_InitTcpNetwork(void)
 }
 
 #include "i_addrinfo.c"
+
+#else // If we ARE compiling for Xenon:
+
+#include "doomdef.h"
+boolean I_InitTcpNetwork(void) { return false; }
+void I_ShutdownTcpDriver(void) {}
+
+#endif

@@ -79,6 +79,10 @@
 #include "gme/gme.h"
 #endif
 
+#ifdef _XENON
+#include <xenon_sound/sound.h>
+#endif
+
 // The number of internal mixing channels,
 //  the samples calculated for each mixing step,
 //  the size of the 16bit, 2 hardware channel (stereo)
@@ -97,6 +101,8 @@
 static Uint16 samplecount = 512; //Alam: .5KB samplecount at 11025hz is 46.439909297052154195011337868481ms of buffer
 #elif defined(GP2X)
 static Uint16 samplecount = 128;
+#elif defined(_XENON)
+static Uint16 samplecount = 2048; // Increasing this will smooth out the audio
 #else
 static Uint16 samplecount = 1024; //Alam: 1KB samplecount at 22050hz is 46.439909297052154195011337868481ms of buffer
 #endif
@@ -1050,6 +1056,16 @@ static void SDLCALL I_UpdateStream(void *userdata, Uint8 *stream, int len)
 	if (!sound_started || !userdata)
 		return;
 
+#ifdef _XENON
+    // Libxenon's backend does not clear the audio buffer for us.
+    // Because SRB2's mixer is additive, we MUST flood the buffer with 
+    // zeros (silence) first, otherwise old sounds get permanently trapped 
+    // in the buffer and echo infinitely.
+    if (!musicStarted) {
+        memset(stream, 0, len);
+    }
+#endif
+
 #if SDL_VERSION_ATLEAST(1,3,0)
 	if (musicStarted)
 		memset(stream, 0x00, len); // only work in !AUDIO_U8, that needs 0x80
@@ -1075,8 +1091,13 @@ static void SDLCALL I_UpdateStream(void *userdata, Uint8 *stream, int len)
 				I_UpdateSteamGME(sa_userdata->gme_emu, (INT16 *)stream, len/4, sa_userdata->gme_loop);
 		}
 #endif
-
 	}
+#ifdef _XENON
+    {
+        // Submit the newly swapped Big Endian buffer to the hardware
+        //xenon_sound_submit(stream, len);
+    }
+#endif
 }
 
 void I_UpdateSoundParams(INT32 handle, UINT8 vol, UINT8 sep, UINT8 pitch)
@@ -1227,6 +1248,12 @@ void I_StartupSound(void)
 		audio.samples = samplecount;
 		audio.freq = cv_samplerate.value;
 	}
+
+#ifdef _XENON
+    xenon_sound_init();
+    audio.freq = 48000; // Xenos audio hardware strictly requires 48kHz!
+    audio.samples = 2048;
+#endif
 
 	if (M_CheckParm ("-mono"))
 	{

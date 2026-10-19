@@ -1986,6 +1986,9 @@ boolean M_Responder(event_t *ev)
 			case KEY_JOY1 + 1:
 				ch = KEY_BACKSPACE;
 				break;
+			case KEY_JOY1 + 7: // Xbox 'Back' button
+                ch = KEY_ESCAPE;
+                break;
 			case KEY_HAT1:
 				ch = KEY_UPARROW;
 				break;
@@ -2294,16 +2297,38 @@ boolean M_Responder(event_t *ev)
 
 		case KEY_BACKSPACE:
 			if ((currentMenu->menuitems[itemOn].status) == IT_CONTROL)
-			{
-				// detach any keys associated with the game control
-				G_ClearControlKeys(setupcontrols, currentMenu->menuitems[itemOn].alphaKey);
-				return true;
-			}
-			// Why _does_ backspace go back anyway?
-			//currentMenu->lastOn = itemOn;
-			//if (currentMenu->prevMenu)
-			//	M_SetupNextMenu(currentMenu->prevMenu);
-			return false;
+            {
+                // detach any keys associated with the game control
+                G_ClearControlKeys(setupcontrols, currentMenu->menuitems[itemOn].alphaKey);
+                return true;
+            }
+            
+            // Re-instating the Backspace (and Xbox 'B' button) back navigation!
+            currentMenu->lastOn = itemOn;
+            if (currentMenu->prevMenu)
+            {
+                //If we entered the game search menu, but didn't enter a game,
+                //make sure the game doesn't still think we're in a netgame.
+                if (!Playing() && netgame && multiplayer)
+                {
+                    MSCloseUDPSocket();     // Clean up so we can re-open the connection later.
+                    netgame = false;
+                    multiplayer = false;
+                }
+
+                if (currentMenu == &SP_TimeAttackDef || currentMenu == &SP_NightsAttackDef)
+                {
+                    // D_StartTitle does its own wipe, since GS_TIMEATTACK is now a complete gamestate.
+                    menuactive = false;
+                    D_StartTitle();
+                }
+                else
+                    M_SetupNextMenu(currentMenu->prevMenu);
+            }
+            else
+                M_ClearMenus(true);
+
+            return true;
 
 		default:
 			break;

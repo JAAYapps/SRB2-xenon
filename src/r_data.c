@@ -476,7 +476,7 @@ void R_LoadTextures(void)
 					patch = &texture->patches[k];
 
 					patch->originx = 0;
-					patch->originy = (INT16)(k*patchlump->height);
+					patch->originy = (INT16)(k * SHORT(patchlump->height));		// Patched to work with the Xbox 360's big endian
 					patch->wad = (UINT16)w;
 					patch->lump = texstart + j;
 				}
